@@ -1,67 +1,61 @@
-import sys
 import os
+import sys
+import time
+
 sys.path.append(os.path.join(os.path.dirname(__file__), "..", "src"))
 
 from pipeline import ClaimVerificationPipeline
 
-# (claim, expected_verdict) — a mix of TRUE/FALSE/MISLEADING/UNKNOWN,
-# including known edge cases found during development
+# expected=None means "show the result, but don't score it"
 EVAL_SET = [
-    ("The Great Wall of China is one continuous wall", "FALSE"),
-    ("The Great Wall of China can be seen from space", "MISLEADING"),
     ("The Eiffel Tower is located in Paris", "TRUE"),
     ("The Eiffel Tower was the tallest structure in the world", "TRUE"),
     ("The Eiffel Tower is the tallest structure in the world", "FALSE"),
     ("World War II ended in 1945", "TRUE"),
     ("Elizabeth II is the current Queen of the United Kingdom", "FALSE"),
+    ("The Great Wall of China is one continuous wall", "FALSE"),
+    ("The Great Wall of China can be seen from space", "MISLEADING"),
     ("Albert Einstein developed the theory of relativity", "TRUE"),
     ("Einstein failed math in school", "FALSE"),
     ("Python is a programming language created by Guido van Rossum", "TRUE"),
     ("The currency of Japan is the yen", "TRUE"),
+    ("Bats are completely blind", "FALSE"),
     ("Mount Everest is the tallest mountain on Earth by elevation", "TRUE"),
     ("The Statue of Liberty is located in Los Angeles", "FALSE"),
+    ("BTS has an album named Arirang", "TRUE"),
+    ("BTS is still on the Arirang tour as of now", "TRUE"),
 ]
 
 
-def run_evaluation():
+if __name__ == "__main__":
     pipeline = ClaimVerificationPipeline()
 
-    correct = 0
-    total = len(EVAL_SET)
-    results_log = []
+    correct = scored = 0
+    misses = []
+    latencies = []
 
+    print(f"{'Expected':<11}{'Actual':<12}{'Source':<28}Claim")
+    print("-" * 100)
     for claim, expected in EVAL_SET:
-        result = pipeline.verify_single_claim(claim)
-        actual = result["verdict"]
-        is_correct = actual == expected
+        start = time.time()
+        r = pipeline.verify_single_claim(claim)
+        latencies.append(time.time() - start)
 
-        if is_correct:
-            correct += 1
+        actual = r["verdict"]
+        if expected is not None:
+            scored += 1
+            if actual == expected:
+                correct += 1
+            else:
+                misses.append((claim, expected, actual))
 
-        results_log.append({
-            "claim": claim,
-            "expected": expected,
-            "actual": actual,
-            "correct": is_correct,
-        })
+        print(f"{(expected or 'n/a'):<11}{actual:<12}{str(r['source_title'])[:26]:<28}{claim}")
+        time.sleep(1)  # stay under Groq free-tier rate limits
 
-        status = "✓" if is_correct else "✗"
-        print(f"{status} [{expected:>10} / {actual:>10}] {claim}")
-
-    accuracy = correct / total * 100
-    print(f"\n{'='*60}")
-    print(f"Accuracy: {correct}/{total} ({accuracy:.1f}%)")
-    print('='*60)
-
-    # breakdown of misses
-    misses = [r for r in results_log if not r["correct"]]
+    print("-" * 100)
+    print(f"Accuracy: {correct}/{scored} ({correct / scored * 100:.1f}%)")
+    print(f"Average latency: {sum(latencies) / len(latencies):.2f}s per claim")
     if misses:
         print("\nMisses:")
-        for m in misses:
-            print(f"  - '{m['claim']}' — expected {m['expected']}, got {m['actual']}")
-
-    return results_log, accuracy
-
-
-if __name__ == "__main__":
-    run_evaluation()
+        for claim, expected, actual in misses:
+            print(f"  - {claim}: expected {expected}, got {actual}")
