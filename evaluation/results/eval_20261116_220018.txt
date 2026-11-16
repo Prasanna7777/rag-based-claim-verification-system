@@ -1,0 +1,25 @@
+Expected   Actual      Source                      Claim
+----------------------------------------------------------------------------------------------------
+TRUE       TRUE        Eiffel Tower                The Eiffel Tower is located in Paris
+TRUE       TRUE        Eiffel Tower                The Eiffel Tower was the tallest structure in the world
+FALSE      FALSE       Eiffel Tower                The Eiffel Tower is the tallest structure in the world
+TRUE       TRUE        World War II                World War II ended in 1945
+FALSE      FALSE       Elizabeth II                Elizabeth II is the current Queen of the United Kingdom
+FALSE      FALSE       Great Wall of China         The Great Wall of China is one continuous wall
+MISLEADING MISLEADING  Great Wall of China         The Great Wall of China can be seen from space
+TRUE       TRUE        Albert Einstein             Albert Einstein developed the theory of relativity
+FALSE      FALSE       Albert Einstein             Einstein failed math in school
+TRUE       TRUE        Python (programming langua  Python is a programming language created by Guido van Rossum
+TRUE       TRUE        Japan                       The currency of Japan is the yen
+FALSE      UNKNOWN     Bat                         Bats are completely blind
+MISLEADING MISLEADING  Napoleon                    Napoleon Bonaparte was extremely short for his era
+TRUE       TRUE        Mount Everest               Mount Everest is the tallest mountain on Earth by elevation
+FALSE      FALSE       Statue of Liberty           The Statue of Liberty is located in Los Angeles
+TRUE       TRUE        Arirang (album)             BTS has an album named Arirang
+FALSE      FALSE       Deadline (EP)               Deadline is an EP released by BTS
+TRUE       TRUE        BTS                         BTS is currently on the Arirang world tour.
+----------------------------------------------------------------------------------------------------
+Accuracy: 17/18 (94.4%)
+
+Misses:
+  - Bats are completely blind: expected FALSE, got UNKNOWN

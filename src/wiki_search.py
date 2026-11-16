@@ -19,12 +19,20 @@ HEADERS = {"User-Agent": "ClaimVerification/1.0 (student project)"}
 session = requests.Session()
 session.headers.update(HEADERS)
 
-spacy.prefer_gpu()
-nlp = spacy.load("en_core_web_trf")
+# Prefer the transformer NER model; fall back to the small one if it isn't installed
+try:
+    nlp = spacy.load("en_core_web_trf")
+except OSError:
+    nlp = spacy.load("en_core_web_sm")
+
 RELEVANT_ENTITY_LABELS = {"PERSON", "ORG", "GPE", "LOC", "FAC", "WORK_OF_ART", "EVENT", "NORP", "PRODUCT"}
+
+MAX_ENTITIES = 2           # how many entities contribute candidates
+CANDIDATES_PER_ENTITY = 4  # opensearch results kept per entity
 
 
 def search_wikipedia_titles(query, limit=6):
+    """Full-text search; used only as a fallback."""
     params = {
         "action": "query",
         "list": "search",
@@ -39,6 +47,7 @@ def search_wikipedia_titles(query, limit=6):
 
 
 def opensearch_titles(query, limit=5):
+    """Title-based matching (the search-box autocomplete API)."""
     params = {
         "action": "opensearch",
         "search": query,
@@ -61,36 +70,51 @@ def get_wikipedia_page(query):
 
 def extract_entities_fast(claim_text):
     """
-    Extracts named entities from the claim using a local NER model (spaCy),
-    which recognizes entities based on context/grammar rather than
-    capitalization alone -- so it works even for casually-typed, lowercase
-    claims (e.g. "great wall of china" still resolves correctly).
-    Falls back to a capitalized-word regex only if spaCy finds nothing.
+    Extracts named entities with spaCy NER, ordered by where they appear in
+    the claim (the subject usually comes first), not by length.
+    Falls back to a capitalized-word regex if spaCy finds nothing.
     """
     doc = nlp(claim_text)
-    entities = [ent.text for ent in doc.ents if ent.label_ in RELEVANT_ENTITY_LABELS]
+    ents = [(e.start_char, e.text) for e in doc.ents if e.label_ in RELEVANT_ENTITY_LABELS]
 
-    seen = set()
-    unique_entities = []
-    for e in entities:
-        if e not in seen:
-            seen.add(e)
-            unique_entities.append(e)
+    if not ents:
+        ents = [
+            (m.start(), m.group())
+            for m in re.finditer(r'\b[A-Z][a-zA-Z]*(?:\s+[A-Z][a-zA-Z]*)*\b', claim_text)
+            if len(m.group()) > 1
+        ]
 
-    if unique_entities:
-        return sorted(unique_entities, key=len, reverse=True)
+    ents.sort()  # by character position in the claim
 
-    matches = re.findall(r'\b[A-Z][a-zA-Z]*(?:\s+[A-Z][a-zA-Z]*)*\b', claim_text)
-    seen = set()
-    fallback = []
-    for m in matches:
-        if m not in seen and len(m) > 1:
-            seen.add(m)
-            fallback.append(m)
-    return sorted(fallback, key=len, reverse=True)
+    seen, ordered = set(), []
+    for _, text in ents:
+        if text not in seen:
+            seen.add(text)
+            ordered.append(text)
+    return ordered
+
+
+def collect_candidates(claim_text):
+    """
+    Pools candidate article titles from each of the first few entities,
+    so the title picker sees pages for every entity, not just one.
+    """
+    entities = extract_entities_fast(claim_text)
+
+    candidates = []
+    for entity in entities[:MAX_ENTITIES]:
+        for title in opensearch_titles(entity, limit=CANDIDATES_PER_ENTITY):
+            if title not in candidates:
+                candidates.append(title)
+
+    if not candidates:
+        candidates = search_wikipedia_titles(claim_text, limit=6)
+
+    return entities, candidates
 
 
 def pick_best_title(claim_text, candidate_titles):
+    """Uses the LLM to pick the candidate article best suited to check the claim."""
     if len(candidate_titles) == 1:
         return candidate_titles[0]
 
@@ -117,25 +141,11 @@ Candidates:
         if chosen.lower() == title.lower():
             return title
 
-    return candidate_titles[0]
+    return candidate_titles[0]  # fallback: first candidate (the first entity's top result)
 
 
 def get_best_matching_page(claim_text):
-    """
-    1. Extract the likely entity using local NER (casing-independent).
-    2. Search for that entity using opensearch (precise title matching).
-    3. If nothing found, fall back to full-text search on the whole claim.
-    4. Let the LLM pick the single best title from the candidates.
-    """
-    entities = extract_entities_fast(claim_text)
-
-    candidates = []
-    if entities:
-        candidates = opensearch_titles(entities[0], limit=6)
-
-    if not candidates:
-        candidates = search_wikipedia_titles(claim_text, limit=6)
-
+    _, candidates = collect_candidates(claim_text)
     if not candidates:
         return None
 
@@ -144,20 +154,19 @@ def get_best_matching_page(claim_text):
 
 
 if __name__ == "__main__":
-    import time
+    RUN_PICKER = False  # set True to also call the LLM title picker (uses Groq quota)
 
     test_claims = [
-        "great wall of china can be seen from space",
+        "BTS has an album called Deadline in their discography",
         "einstein failed math in school",
-        "current prime minister of india is jaya prakash",
+        "great wall of china can be seen from space",
         "The Eiffel Tower is located in Paris",
     ]
 
     for c in test_claims:
-        start = time.time()
-        entities = extract_entities_fast(c)
-        page = get_best_matching_page(c)
-        elapsed = time.time() - start
-        print(f"Claim: '{c}'")
-        print(f"  Entities: {entities}")
-        print(f"  -> {page.title if page else 'Not found'} ({elapsed:.2f}s)\n")
+        entities, candidates = collect_candidates(c)
+        print(f"\nClaim: {c}")
+        print(f"  Entities (claim order): {entities}")
+        print(f"  Candidate pool: {candidates}")
+        if RUN_PICKER:
+            print(f"  Picked: {pick_best_title(c, candidates) if candidates else None}")
