@@ -10,7 +10,10 @@ Built from scratch (no LangChain / LangGraph) as a learning project on free tool
 
 **Frontend on GitHub Pages:** https://prasanna7777.github.io/rag-based-claim-verification-system/ *(interface only; submitting a claim shows "can't reach the server" because the backend runs locally. See the recording below for the full system.)*
 
-![Demo](docs/demo.gif)
+
+
+https://github.com/user-attachments/assets/80668426-1433-4405-8c48-e4a0e9e8954c
+
 
 | Misleading | Unverifiable | Multi-claim | Error state |
 |---|---|---|---|
