@@ -15,11 +15,12 @@ Built from scratch (no LangChain / LangGraph) as a learning project on free tool
 https://github.com/user-attachments/assets/80668426-1433-4405-8c48-e4a0e9e8954c
 
 
-| Misleading | Unverifiable | Multi-claim | Error state |
-|---|---|---|---|
-| ![Misleading](docs/misleading.png) | ![Unverifiable](docs/unverifiable.png) | ![Multi-claim](docs/multi-claim.png) | ![Error](docs/error.png) |
+Responsive layout:
 
-Responsive layout (phone width): ![Mobile](docs/mobile.gif)
+
+https://github.com/user-attachments/assets/489acbb9-df4b-4ca3-b157-a41199725bf4
+
+
 
 ## What it does
 
