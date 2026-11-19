@@ -1,7 +1,7 @@
 import { useState } from "react";
 import "./App.css";
 
-const API_BASE = "http://127.0.0.1:8000";
+const API_BASE = import.meta.env.VITE_API_URL ?? "http://localhost:8000";
 
 type Verdict = "TRUE" | "FALSE" | "MISLEADING" | "UNKNOWN";
 
@@ -61,7 +61,13 @@ function App() {
       setResponse(data);
     } catch (err) {
       console.error(err);
-      setError(err instanceof Error ? err.message : "Could not reach the verification service.");
+      setError(
+        err instanceof TypeError
+          ? "Can't reach the server. The backend runs locally. See the demo in the README."
+          : err instanceof Error
+            ? err.message
+            : "Could not reach the verification service."
+      );
     } finally {
       setLoading(false);
     }
